@@ -4,10 +4,9 @@ Sample Python project with a deliberately vulnerable dependency, used to
 exercise Aisle's SCA pipeline (PLA-857: retriage IGNORED/DISMISSED issues
 when new findings arrive).
 
-## Vulnerable dependency
+## Dependency note
 
-- `requests==2.19.0` — CVE-2018-18074 (`requests` leaks Authorization header
-  on cross-origin redirect).
+This repo previously pinned `requests==2.19.0` (affected by CVE-2018-18074: `requests` could leak an `Authorization` header on cross-origin redirect). It has been upgraded to `requests==2.33.0`.
 
 ## Workflow under test
 
