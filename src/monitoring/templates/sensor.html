@@ -7,6 +7,10 @@
     Created {{ sensor.created_at.strftime("%Y-%m-%d %H:%M") }}.
   </p>
 
+  <div class="sensor-meta-badge" {{ sensor.metadata_json|xmlattr }}>
+    metadata
+  </div>
+
   <h3>Measurements (last 24 h)</h3>
   <canvas id="chart" height="120" data-sensor-id="{{ sensor.id }}"></canvas>
   <p id="chart-empty" class="empty" style="display:none">No measurements in the last 24 hours.</p>

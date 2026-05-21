@@ -1,14 +1,30 @@
+import re
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Comparator = Literal["gt", "gte", "lt", "lte"]
+
+_METADATA_KEY_RE = re.compile(r"^[a-z][a-z0-9_-]{0,30}$")
+
+
+def _validate_metadata_keys(metadata: dict[str, str]) -> dict[str, str]:
+    for key in metadata:
+        if not _METADATA_KEY_RE.fullmatch(key):
+            raise ValueError(f"metadata key {key!r} is not allowed")
+    return metadata
 
 
 class SensorCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     location: str | None = Field(default=None, max_length=200)
+    metadata: dict[str, str] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _check_metadata_keys(self) -> "SensorCreate":
+        _validate_metadata_keys(self.metadata)
+        return self
 
 
 class SensorOut(BaseModel):
@@ -18,6 +34,12 @@ class SensorOut(BaseModel):
     name: str
     location: str | None
     created_at: datetime
+    metadata: dict[str, str] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _check_metadata_keys(self) -> "SensorOut":
+        _validate_metadata_keys(self.metadata)
+        return self
 
 
 class MeasurementCreate(BaseModel):
