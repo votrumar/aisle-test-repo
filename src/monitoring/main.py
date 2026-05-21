@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from .routers import alert_events, alert_rules, dashboard, measurements, sensors
+from .routers import admin, alert_events, alert_rules, dashboard, measurements, sensors
 from . import services  # noqa: F401
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -19,6 +19,7 @@ def create_app() -> FastAPI:
     app.include_router(alert_rules.router)
     app.include_router(alert_events.router)
     app.include_router(dashboard.router)
+    app.include_router(admin.router)
 
     @app.get("/healthz", tags=["meta"])
     def healthz() -> dict[str, str]:
