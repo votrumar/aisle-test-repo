@@ -1,5 +1,5 @@
-import py
+import wheel
 
 
-def dev_workdir() -> str:
-    return str(py.path.local())
+def packager_version() -> str:
+    return wheel.__version__
