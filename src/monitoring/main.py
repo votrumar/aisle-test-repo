@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from .routers import alert_events, alert_rules, dashboard, measurements, sensors
+from . import services  # noqa: F401
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 
