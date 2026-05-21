@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>{% block title %}Storage Monitoring{% endblock %}</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 2rem auto; max-width: 960px; padding: 0 1rem; }
+      h1, h2 { margin-top: 1.5rem; }
+      table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+      th, td { padding: 0.4rem 0.6rem; border-bottom: 1px solid #ddd; text-align: left; font-size: 0.9rem; }
+      th { background: rgba(0,0,0,0.04); }
+      a { color: #2563eb; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .empty { color: #777; font-style: italic; }
+      .pill { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 999px; background: #fee2e2; color: #991b1b; font-size: 0.75rem; }
+      canvas { max-width: 100%; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1><a href="/">Storage Monitoring</a></h1>
+    </header>
+    {% block content %}{% endblock %}
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

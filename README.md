@@ -1,34 +1,110 @@
-# aisle-test-repo
+# Storage Conditions Monitoring
 
-Sample Python project with a deliberately vulnerable dependency, used to
-exercise Aisle's SCA pipeline (PLA-857: retriage IGNORED/DISMISSED issues
-when new findings arrive).
+FastAPI service for ingesting sensor measurements (temperature, humidity, …),
+evaluating threshold alerts on write, and viewing recent data in a built-in
+Jinja2 + Chart.js dashboard. Backed by Postgres. No authentication — the API
+and dashboard are public.
 
-## Vulnerable dependency
+## Stack
 
-- `Pillow==8.1.0` — multiple CVEs in image decoders (TIFF, ICNS, SGI, BLP).
-  Examples: CVE-2021-25287, CVE-2021-25288, CVE-2021-27921, CVE-2021-27922,
-  CVE-2021-27923.
+- FastAPI + Uvicorn
+- SQLAlchemy 2.x + `psycopg` driver
+- Postgres 16 (schema bootstrapped from `scripts/init.sql`)
+- Jinja2 templates + Chart.js (loaded from CDN) for the dashboard
+- Docker Compose for local orchestration
 
-## Why the vulnerable code is NOT reachable
+## Layout
 
-`src/sample/main.py` uses Pillow strictly to *generate* PNGs in memory:
-
-```python
-img = Image.new("RGB", (width, height), color=color)
-img.save(buf, format="PNG")
+```
+src/monitoring/
+  main.py            FastAPI app factory + router mounting
+  config.py          DATABASE_URL via pydantic-settings
+  db.py              SQLAlchemy engine + session dependency
+  models.py          ORM models
+  schemas.py         Pydantic request/response models
+  alerts.py          Synchronous threshold evaluation
+  routers/           JSON + dashboard routes
+  templates/         Jinja2 HTML
+  static/app.js      Chart.js wiring
+scripts/init.sql     CREATE TABLE statements (mounted into the Postgres container)
+tests/test_api.py    End-to-end pytest suite
+Dockerfile
+docker-compose.yml
 ```
 
-It never calls `Image.open` or any other entry point that touches an image
-decoder, so none of the CVEs above are reachable from application code.
-Aisle's triage should mark the SCA finding as not relevant.
+## Run locally (Docker Compose)
 
-## Workflow under test
+```bash
+docker compose up --build
+```
 
-1. Import the repo into Aisle and run Snyk SCA. Triage marks the issue
-   "not relevant" / dismisses it (no vulnerable code path).
-2. Downgrade the dep further (e.g. `Pillow==7.0.0`) to surface additional
-   CVEs.
-3. Re-run the Snyk import. The previously dismissed issue must
-   automatically re-triage with reason "A new finding has been detected:
-   CVE-...".
+- API: <http://localhost:8000>
+- Dashboard: <http://localhost:8000/>
+- OpenAPI docs: <http://localhost:8000/docs>
+- Postgres: `localhost:5432` (user/pass/db: `monitoring`)
+
+The Postgres container runs `scripts/init.sql` on first start (it is mounted
+read-only into `/docker-entrypoint-initdb.d/`). Drop the `pgdata` volume
+(`docker compose down -v`) if you want to re-seed the schema.
+
+## Run locally (without Docker)
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+# Point at a running Postgres and apply the schema once:
+psql "$DATABASE_URL" -f scripts/init.sql
+export DATABASE_URL=postgresql+psycopg://monitoring:monitoring@localhost:5432/monitoring
+uvicorn monitoring.main:app --reload
+```
+
+## API quick tour
+
+```bash
+# Create a sensor
+curl -X POST http://localhost:8000/sensors \
+  -H 'content-type: application/json' \
+  -d '{"name":"freezer-1","location":"warehouse-A"}'
+
+# Create an alert rule (fire when temperature > -15 C)
+curl -X POST http://localhost:8000/alert-rules \
+  -H 'content-type: application/json' \
+  -d '{"name":"too-hot","sensor_id":1,"metric":"temperature","comparator":"gt","threshold":-15}'
+
+# Submit a measurement (will trigger the rule)
+curl -X POST http://localhost:8000/measurements \
+  -H 'content-type: application/json' \
+  -d '{"sensor_id":1,"metric":"temperature","value":-10,"unit":"C"}'
+
+# Inspect triggered alerts
+curl http://localhost:8000/alert-events
+```
+
+Alert evaluation runs **synchronously** inside the same DB transaction as the
+measurement insert. The `POST /measurements` response includes a
+`triggered_alerts` array so clients can react inline. Triggered events are
+also persisted in `alert_events` and surfaced on the dashboard.
+
+## Dashboard
+
+- `/` — list of sensors and the most recent alert events.
+- `/sensors/{id}/view` — Chart.js line chart of the sensor's measurements
+  (defaults to the last 24 hours), grouped by metric, plus the sensor's recent
+  alert events.
+
+## Tests
+
+```bash
+pip install -r requirements.txt
+# Tests need a Postgres pointed at by DATABASE_URL with the schema applied.
+export DATABASE_URL=postgresql+psycopg://monitoring:monitoring@localhost:5432/monitoring
+psql "$DATABASE_URL" -f scripts/init.sql   # idempotent if already applied
+pytest
+```
+
+Or, against the docker-compose stack:
+
+```bash
+docker compose up -d db
+DATABASE_URL=postgresql+psycopg://monitoring:monitoring@localhost:5432/monitoring pytest
+```
