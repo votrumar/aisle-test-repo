@@ -12,3 +12,5 @@ paramiko==2.9.2
 lxml==4.9.0
 aiohttp==3.9.1
 Werkzeug==3.0.0
+python-jose==3.3.0
+PyYAML==5.3.1
