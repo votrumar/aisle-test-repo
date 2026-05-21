@@ -23,4 +23,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=5 \
     CMD curl -fsS http://localhost:8000/healthz || exit 1
 
-CMD ["uvicorn", "monitoring.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# gunicorn fronts uvicorn workers; deployment expects to sit behind a TE-stripping proxy (caddy/nginx)
+CMD ["gunicorn", "monitoring.main:app", "-k", "uvicorn.workers.UvicornWorker", "-w", "2", "-b", "0.0.0.0:8000", "--forwarded-allow-ips=127.0.0.1", "--limit-request-line=8190", "--limit-request-fields=64"]

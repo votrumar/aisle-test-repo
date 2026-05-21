@@ -1,8 +1,11 @@
 from . import (
     checksum,
+    config_import,
     defaults,
+    file_export,
     health_probe,
     notifications,
+    package_inventory,
     remote_log,
     request_ids,
     tokens,
@@ -13,9 +16,12 @@ from . import (
 
 __all__ = [
     "checksum",
+    "config_import",
     "defaults",
+    "file_export",
     "health_probe",
     "notifications",
+    "package_inventory",
     "remote_log",
     "request_ids",
     "tokens",
