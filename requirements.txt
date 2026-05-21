@@ -10,3 +10,5 @@ httpx>=0.27
 pytest>=8
 paramiko==2.9.2
 lxml==4.9.0
+aiohttp==3.9.1
+Werkzeug==3.0.0
