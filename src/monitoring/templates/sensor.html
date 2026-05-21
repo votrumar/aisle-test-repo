@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}{{ sensor.name }} · Storage Monitoring{% endblock %}
+{% block content %}
+  <h2>{{ sensor.name }}</h2>
+  <p>
+    Sensor #{{ sensor.id }}{% if sensor.location %} — {{ sensor.location }}{% endif %}.
+    Created {{ sensor.created_at.strftime("%Y-%m-%d %H:%M") }}.
+  </p>
+
+  <h3>Measurements (last 24 h)</h3>
+  <canvas id="chart" height="120" data-sensor-id="{{ sensor.id }}"></canvas>
+  <p id="chart-empty" class="empty" style="display:none">No measurements in the last 24 hours.</p>
+
+  <h3>Recent alerts</h3>
+  {% if recent_alerts %}
+    <table>
+      <thead><tr><th>Time</th><th>Rule</th><th>Value</th></tr></thead>
+      <tbody>
+        {% for ev in recent_alerts %}
+          <tr>
+            <td>{{ ev.triggered_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+            <td>rule #{{ ev.rule_id }}</td>
+            <td><span class="pill">{{ "%.3f"|format(ev.value) }}</span></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">No alerts for this sensor yet.</p>
+  {% endif %}
+{% endblock %}
+{% block scripts %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script src="/static/app.js"></script>
+{% endblock %}

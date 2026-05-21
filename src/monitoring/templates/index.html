@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Sensors · Storage Monitoring{% endblock %}
+{% block content %}
+  <h2>Sensors</h2>
+  {% if sensors %}
+    <table>
+      <thead><tr><th>ID</th><th>Name</th><th>Location</th><th>Created</th><th></th></tr></thead>
+      <tbody>
+        {% for s in sensors %}
+          <tr>
+            <td>{{ s.id }}</td>
+            <td>{{ s.name }}</td>
+            <td>{{ s.location or "" }}</td>
+            <td>{{ s.created_at.strftime("%Y-%m-%d %H:%M") }}</td>
+            <td><a href="/sensors/{{ s.id }}/view">view</a></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">No sensors yet. POST one to <code>/sensors</code>.</p>
+  {% endif %}
+
+  <h2>Recent alerts</h2>
+  {% if recent_alerts %}
+    <table>
+      <thead><tr><th>Time</th><th>Sensor</th><th>Rule</th><th>Value</th></tr></thead>
+      <tbody>
+        {% for ev in recent_alerts %}
+          <tr>
+            <td>{{ ev.triggered_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+            <td><a href="/sensors/{{ ev.sensor_id }}/view">#{{ ev.sensor_id }}</a></td>
+            <td>rule #{{ ev.rule_id }}</td>
+            <td><span class="pill">{{ "%.3f"|format(ev.value) }}</span></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">No alerts triggered yet.</p>
+  {% endif %}
+{% endblock %}
