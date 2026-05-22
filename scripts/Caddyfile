@@ -1,0 +1,12 @@
+# Front the gunicorn API. Strip any client-supplied Transfer-Encoding
+# header before forwarding so gunicorn never observes an ambiguous
+# TE+Content-Length pair (the precondition for CVE-2024-1135 HTTP
+# request smuggling). Caddy parses the inbound request, re-emits a
+# canonical request to the upstream, and overrides TE/CL with values
+# it controls.
+:8000 {
+    request_header -Transfer-Encoding
+    reverse_proxy api:8000 {
+        header_up -Transfer-Encoding
+    }
+}

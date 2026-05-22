@@ -25,8 +25,22 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg://monitoring:monitoring@db:5432/monitoring
+    # api is not published directly; the proxy is the only ingress.
+
+  # Caddy reverse proxy fronts the gunicorn workers. It terminates the
+  # client HTTP connection, strips any client-supplied Transfer-Encoding
+  # header, and only ever forwards a single canonical TE/Content-Length
+  # pair to gunicorn. This is the real mitigation for CVE-2024-1135
+  # request smuggling — gunicorn never sees ambiguous TE+CL headers
+  # because the proxy normalizes them upstream.
+  proxy:
+    image: caddy:2.8-alpine
+    depends_on:
+      - api
     ports:
       - "8001:8000"
+    volumes:
+      - ./scripts/Caddyfile:/etc/caddy/Caddyfile:ro
 
 volumes:
   pgdata:
