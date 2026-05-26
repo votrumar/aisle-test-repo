@@ -139,3 +139,20 @@ def test_sensor_view_renders(client):
     r = client.get(f"/sensors/{sensor['id']}/view")
     assert r.status_code == 200
     assert "chart-me" in r.text
+
+
+def test_sensor_metadata_is_not_rendered_as_html_attributes(client):
+    sensor = client.post(
+        "/sensors",
+        json={"name": "xss-meta", "metadata": {"onclick": "alert(1)", "role": "admin"}},
+    ).json()
+
+    r = client.get(f"/sensors/{sensor['id']}/view")
+    assert r.status_code == 200
+
+    # Regression test for stored XSS via Jinja's `xmlattr` filter:
+    # user-controlled metadata keys must never become HTML attributes.
+    html = r.text.lower()
+    assert "onclick=" not in html
+    assert "onclick" in html
+    assert "alert(1)" in html
