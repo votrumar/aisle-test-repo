@@ -5,6 +5,7 @@ description = "FastAPI service for sensor measurements, threshold alerts, and a 
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",
+    "starlette==1.0.0",
     "uvicorn[standard]>=0.30",
     "sqlalchemy>=2.0",
     "psycopg[binary]>=3.2",
