@@ -1,3 +1,11 @@
+from monitoring.services.tokens import sign
+
+
+def _admin_headers() -> dict[str, str]:
+    token = sign({"sub": "test-admin"}, "dev-secret")
+    return {"authorization": f"Bearer {token}", "content-type": "application/yaml"}
+
+
 def test_healthz(client):
     r = client.get("/healthz")
     assert r.status_code == 200
@@ -139,3 +147,36 @@ def test_sensor_view_renders(client):
     r = client.get(f"/sensors/{sensor['id']}/view")
     assert r.status_code == 200
     assert "chart-me" in r.text
+
+
+def test_admin_import_config_accepts_safe_yaml(client):
+    yaml_text = """\
+rules:
+  - name: too-hot
+    metric: temperature
+    comparator: gt
+    threshold: 10.0
+"""
+    r = client.post("/admin/import-config", data=yaml_text, headers=_admin_headers())
+    assert r.status_code == 200, r.text
+    parsed = r.json()["parsed"]
+    assert parsed["rules"][0]["name"] == "too-hot"
+
+
+def test_admin_import_config_rejects_unsafe_yaml_tags(client):
+    malicious = """\
+!!python/object/new:os.system
+- echo pwned
+"""
+    r = client.post("/admin/import-config", data=malicious, headers=_admin_headers())
+    assert r.status_code == 400
+    assert "invalid YAML" in r.text
+
+
+def test_admin_import_config_rejects_yaml_alias_bomb(client):
+    # Small input which expands via repeated alias references.
+    alias_refs = "\n".join(f"v{i}: *a" for i in range(0, 60))
+    bomb = f"a: &a [1]\n{alias_refs}\n"
+    r = client.post("/admin/import-config", data=bomb, headers=_admin_headers())
+    assert r.status_code == 400
+    assert "invalid YAML" in r.text
