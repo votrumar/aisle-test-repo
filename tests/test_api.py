@@ -139,3 +139,25 @@ def test_sensor_view_renders(client):
     r = client.get(f"/sensors/{sensor['id']}/view")
     assert r.status_code == 200
     assert "chart-me" in r.text
+
+
+def test_admin_import_sensor_config_accepts_multipart(client):
+    # Protected route: provide a valid Bearer JWT matching the middleware secret.
+    from monitoring.services.tokens import sign
+
+    token = sign({"sub": "admin"}, "dev-secret")
+    r = client.post(
+        "/admin/import-sensor-config",
+        headers={"Authorization": f"Bearer {token}"},
+        files={
+            "freezer-10": (None, "warehouse-A"),
+            "freezer-11": (None, ""),
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert r.json() == {"accepted": 2}
+
+    sensors = client.get("/sensors").json()
+    by_name = {s["name"]: s["location"] for s in sensors}
+    assert by_name["freezer-10"] == "warehouse-A"
+    assert by_name["freezer-11"] is None
