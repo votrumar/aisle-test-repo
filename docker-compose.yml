@@ -25,6 +25,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg://monitoring:monitoring@db:5432/monitoring
+      MONITORING_AUTH_SECRET: ${MONITORING_AUTH_SECRET:?MONITORING_AUTH_SECRET must be set}
     # api is not published directly; the proxy is the only ingress.
 
   # Caddy reverse proxy fronts the gunicorn workers. It terminates the

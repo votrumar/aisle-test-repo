@@ -2,8 +2,11 @@
 
 FastAPI service for ingesting sensor measurements (temperature, humidity, …),
 evaluating threshold alerts on write, and viewing recent data in a built-in
-Jinja2 + Chart.js dashboard. Backed by Postgres. No authentication — the API
-and dashboard are public.
+Jinja2 + Chart.js dashboard. Backed by Postgres.
+
+Most endpoints are public, but privileged admin routes under `/admin/*` require
+an `Authorization: Bearer <jwt>` header validated with `MONITORING_AUTH_SECRET`
+(and the JWT must include `{"role": "admin"}`).
 
 ## Stack
 
@@ -35,6 +38,9 @@ docker-compose.yml
 ## Run locally (Docker Compose)
 
 ```bash
+cp .env.example .env
+# Edit .env and set MONITORING_AUTH_SECRET
+
 docker compose up --build
 ```
 
@@ -55,6 +61,7 @@ pip install -r requirements.txt
 # Point at a running Postgres and apply the schema once:
 psql "$DATABASE_URL" -f scripts/init.sql
 export DATABASE_URL=postgresql+psycopg://monitoring:monitoring@localhost:5432/monitoring
+export MONITORING_AUTH_SECRET="$(openssl rand -hex 32)"
 uvicorn monitoring.main:app --reload
 ```
 
@@ -107,4 +114,6 @@ Or, against the docker-compose stack:
 ```bash
 docker compose up -d db
 DATABASE_URL=postgresql+psycopg://monitoring:monitoring@localhost:5432/monitoring pytest
+```
+32/monitoring pytest
 ```
