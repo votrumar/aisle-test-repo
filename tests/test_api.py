@@ -139,3 +139,24 @@ def test_sensor_view_renders(client):
     r = client.get(f"/sensors/{sensor['id']}/view")
     assert r.status_code == 200
     assert "chart-me" in r.text
+
+
+def test_sensor_view_does_not_render_metadata_as_html_attributes(client):
+    sensor = client.post(
+        "/sensors",
+        json={
+            "name": "xss-metadata",
+            "metadata": {
+                "onmouseover": "alert(1)",
+                "notes": "<script>alert(1)</script>",
+            },
+        },
+    ).json()
+
+    r = client.get(f"/sensors/{sensor['id']}/view")
+    assert r.status_code == 200
+
+    # Stored-XSS regression: metadata keys/values must never be emitted as HTML attributes.
+    assert "onmouseover=" not in r.text
+    assert "<script>alert(1)</script>" not in r.text
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in r.text
