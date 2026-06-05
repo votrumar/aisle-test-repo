@@ -18,6 +18,18 @@ services:
       timeout: 3s
       retries: 10
 
+  oauth2-proxy:
+    image: cgr.dev/aisle.com/oauth2-proxy:7.14.2
+    container_name: aisle-oauth2-proxy.local
+    labels:
+      - dev.orbstack.domains=aisle-oauth2-proxy.local
+    ports:
+      - "127.0.0.1:8000:4180"
+    environment:
+      # Basic configuration
+      OAUTH2_PROXY_HTTP_ADDRESS: "0.0.0.0:4180"
+      OAUTH2_PROXY_UPSTREAMS: "http://app:8001/metrics/,http://app:8100/api/v1/,http://app:8000/"
+
   api:
     build: .
     depends_on:
