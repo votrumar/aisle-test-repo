@@ -139,3 +139,13 @@ def test_sensor_view_renders(client):
     r = client.get(f"/sensors/{sensor['id']}/view")
     assert r.status_code == 200
     assert "chart-me" in r.text
+
+
+def test_admin_paths_require_auth_even_with_malformed_host(client):
+    # Regression test for the Starlette 1.0.0 Host-header URL reconstruction bug.
+    # If the auth gate used request.url.path, a Host like "testserver/public" could
+    # cause the path check to miss the /admin prefix and allow unauthenticated access.
+    r = client.get("/admin/packages", headers={"host": "testserver/public"})
+    assert r.status_code in (400, 401)
+    if r.status_code == 401:
+        assert r.json() == {"detail": "missing bearer token"}

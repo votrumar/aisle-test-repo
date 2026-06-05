@@ -32,7 +32,10 @@ class PathAuthMiddleware(BaseHTTPMiddleware):
         self._secret = secret
 
     async def dispatch(self, request: Request, call_next):
-        path = request.url.path
+        # Use the raw ASGI path rather than request.url.path.
+        # Starlette 1.0.0 could reconstruct request.url from an unvalidated Host
+        # header, allowing request.url.path to differ from the actual request path.
+        path = request.scope.get("path") or request.url.path
 
         if _matches_any(path, _PUBLIC_PREFIXES):
             return await call_next(request)
