@@ -58,8 +58,23 @@ async def import_sensor_config(request: Request, db: Session = Depends(get_db)) 
     return {"accepted": accepted}
 
 
+_MAX_IMPORT_CONFIG_BYTES = 1_048_576
+
+
 @router.post("/import-config")
 async def import_config(request: Request) -> dict:
-    yaml_text = (await request.body()).decode("utf-8")
-    parsed = import_alert_rules(yaml_text)
+    body = await request.body()
+    if len(body) > _MAX_IMPORT_CONFIG_BYTES:
+        raise HTTPException(status_code=413, detail="config payload too large")
+
+    try:
+        yaml_text = body.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(status_code=400, detail="config payload must be UTF-8") from exc
+
+    try:
+        parsed = import_alert_rules(yaml_text)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     return {"parsed": parsed}
