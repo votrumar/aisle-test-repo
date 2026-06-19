@@ -139,3 +139,15 @@ def test_sensor_view_renders(client):
     r = client.get(f"/sensors/{sensor['id']}/view")
     assert r.status_code == 200
     assert "chart-me" in r.text
+
+
+def test_admin_requires_token(client):
+    r = client.get("/admin/packages")
+    assert r.status_code == 401
+
+
+def test_admin_host_header_poisoning_does_not_bypass_auth(client):
+    # Regression test for Host-header URL parsing issues: a crafted Host header
+    # must not affect path-based authorization.
+    r = client.get("/admin/packages", headers={"host": "example.com/dashboard"})
+    assert r.status_code == 401
