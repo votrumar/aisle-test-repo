@@ -7,6 +7,8 @@ from sqlalchemy import create_engine, text
 
 _DEFAULT_DB = "postgresql+psycopg://monitoring:monitoring@localhost:5432/monitoring"
 os.environ.setdefault("DATABASE_URL", _DEFAULT_DB)
+# Required by PathAuthMiddleware/get_auth_secret() during app creation.
+os.environ.setdefault("MONITORING_AUTH_SECRET", "test-secret-please-change-32-bytes-min")
 
 from monitoring.config import settings  # noqa: E402  (imported after env var)
 from monitoring.main import app  # noqa: E402

@@ -1,3 +1,15 @@
+import os
+
+from monitoring.services.tokens import sign
+
+
+def _admin_headers(secret: str | None = None) -> dict[str, str]:
+    if secret is None:
+        secret = os.environ["MONITORING_AUTH_SECRET"]
+    token = sign({"sub": "test-admin"}, secret)
+    return {"Authorization": f"Bearer {token}"}
+
+
 def test_healthz(client):
     r = client.get("/healthz")
     assert r.status_code == 200
@@ -139,3 +151,46 @@ def test_sensor_view_renders(client):
     r = client.get(f"/sensors/{sensor['id']}/view")
     assert r.status_code == 200
     assert "chart-me" in r.text
+
+
+def test_admin_import_config_parses_yaml(client):
+    yaml_body = "rules:\n  - name: too-hot\n    metric: temperature\n"
+    r = client.post(
+        "/admin/import-config",
+        headers={**_admin_headers(), "content-type": "application/yaml"},
+        data=yaml_body,
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["parsed"]["rules"][0]["name"] == "too-hot"
+
+
+def test_admin_import_config_rejects_python_object_tags(client):
+    yaml_body = "!!python/object/new:tuple [1, 2]\n"
+    r = client.post(
+        "/admin/import-config",
+        headers={**_admin_headers(), "content-type": "application/yaml"},
+        data=yaml_body,
+    )
+    assert r.status_code == 400
+
+
+def test_admin_import_config_rejects_non_admin_tokens(client):
+    # A valid JWT without the admin role must not grant /admin access.
+    token = sign({"sub": "device-1", "role": "device"}, os.environ["MONITORING_AUTH_SECRET"])
+    r = client.post(
+        "/admin/import-config",
+        headers={"Authorization": f"Bearer {token}", "content-type": "application/yaml"},
+        data="rules: []\n",
+    )
+    assert r.status_code == 403
+
+
+def test_admin_import_config_rejects_oversized_yaml(client):
+    # Must be larger than the server-side limit in `monitoring.routers.admin`.
+    yaml_body = "a" * (1_048_576 + 1)
+    r = client.post(
+        "/admin/import-config",
+        headers={**_admin_headers(), "content-type": "application/yaml"},
+        data=yaml_body,
+    )
+    assert r.status_code == 413

@@ -3,11 +3,11 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ..config import get_settings
 from ..db import get_db
 from ..models import Sensor
 from ..schemas import SensorCreate, SensorOut
 from ..services import tokens
+from ..services.auth_gate import get_auth_secret
 from ..services.xml_export import parse_sensor_xml
 
 router = APIRouter(prefix="/sensors", tags=["sensors"])
@@ -83,9 +83,9 @@ def register_sensor(
     token = payload.get("device_token")
     if not isinstance(token, str):
         raise HTTPException(status_code=422, detail="device_token is required")
-    settings = get_settings()
+    secret = get_auth_secret()
     try:
-        claims = tokens.verify(token, settings.jwt_secret.get_secret_value())
+        claims = tokens.verify(token, secret)
     except Exception:
         raise HTTPException(status_code=401, detail="invalid device token")
     name = claims.get("sensor_name") or f"device-{claims.get('sub', 'unknown')}"
