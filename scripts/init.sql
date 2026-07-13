@@ -3,11 +3,16 @@
 -- container runs this from /docker-entrypoint-initdb.d/ on first boot.
 
 CREATE TABLE IF NOT EXISTS sensors (
-    id          SERIAL PRIMARY KEY,
-    name        TEXT NOT NULL UNIQUE,
-    location    TEXT,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    id            SERIAL PRIMARY KEY,
+    name          TEXT NOT NULL UNIQUE,
+    location      TEXT,
+    metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Keep existing databases compatible if the column was added after initial boot.
+ALTER TABLE sensors
+    ADD COLUMN IF NOT EXISTS metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb;
 
 CREATE TABLE IF NOT EXISTS measurements (
     id           BIGSERIAL PRIMARY KEY,

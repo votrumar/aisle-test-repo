@@ -8,12 +8,28 @@ Comparator = Literal["gt", "gte", "lt", "lte"]
 
 _METADATA_KEY_RE = re.compile(r"^[a-z][a-z0-9_-]{0,30}$")
 
+# Denylist for attribute-like keys that become dangerous if ever rendered into HTML.
+# (The dashboard previously rendered metadata keys through Jinja2's `xmlattr` filter.)
+_DISALLOWED_METADATA_KEYS = {"style"}
+_DISALLOWED_METADATA_PREFIXES = ("on",)  # e.g. onmouseover
 
-def _validate_metadata_keys(metadata: dict[str, str]) -> dict[str, str]:
-    for key in metadata:
+
+def _sanitize_metadata(metadata: dict[str, str], *, strict: bool) -> dict[str, str]:
+    sanitized: dict[str, str] = {}
+    for key, value in metadata.items():
         if not _METADATA_KEY_RE.fullmatch(key):
-            raise ValueError(f"metadata key {key!r} is not allowed")
-    return metadata
+            if strict:
+                raise ValueError(f"metadata key {key!r} is not allowed")
+            continue
+
+        if key in _DISALLOWED_METADATA_KEYS or key.startswith(_DISALLOWED_METADATA_PREFIXES):
+            if strict:
+                raise ValueError(f"metadata key {key!r} is not allowed")
+            continue
+
+        sanitized[key] = value
+
+    return sanitized
 
 
 class SensorCreate(BaseModel):
@@ -23,7 +39,8 @@ class SensorCreate(BaseModel):
 
     @model_validator(mode="after")
     def _check_metadata_keys(self) -> "SensorCreate":
-        _validate_metadata_keys(self.metadata)
+        # Strict validation for write paths.
+        self.metadata = _sanitize_metadata(self.metadata, strict=True)
         return self
 
 
@@ -38,7 +55,8 @@ class SensorOut(BaseModel):
 
     @model_validator(mode="after")
     def _check_metadata_keys(self) -> "SensorOut":
-        _validate_metadata_keys(self.metadata)
+        # Be tolerant when reading older rows; drop keys that are not allowed.
+        self.metadata = _sanitize_metadata(self.metadata, strict=False)
         return self
 
 
