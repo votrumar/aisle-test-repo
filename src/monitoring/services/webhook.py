@@ -2,7 +2,7 @@ import json
 import os
 
 import requests
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 _session: requests.Session | None = None
 
@@ -17,14 +17,10 @@ def _get_session() -> requests.Session:
 
 
 def encrypt_payload(plaintext: bytes, key: bytes) -> bytes:
-    iv = os.urandom(16)
-    cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
-    encryptor = cipher.encryptor()
-    padded = plaintext + b"\x00" * (-len(plaintext) % 16)
-    out = bytearray(len(padded))
-    encryptor.update_into(padded, out)
-    encryptor.finalize()
-    return iv + bytes(out)
+    aesgcm = AESGCM(key)
+    nonce = os.urandom(12)
+    ciphertext = aesgcm.encrypt(nonce, plaintext, associated_data=None)
+    return nonce + ciphertext
 
 
 def post_alert(url: str, payload: dict, *, timeout: float = 5.0) -> int:
