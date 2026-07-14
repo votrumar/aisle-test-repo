@@ -139,3 +139,43 @@ def test_sensor_view_renders(client):
     r = client.get(f"/sensors/{sensor['id']}/view")
     assert r.status_code == 200
     assert "chart-me" in r.text
+
+
+def _admin_headers(secret: str = "dev-secret") -> dict[str, str]:
+    from monitoring.services.tokens import sign
+
+    token = sign({"sub": "admin"}, secret)
+    return {"authorization": f"Bearer {token}"}
+
+
+def test_admin_import_config_accepts_safe_yaml(client):
+    r = client.post(
+        "/admin/import-config",
+        data="alerts_enabled: true\n",
+        headers=_admin_headers(),
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["parsed"]["alerts_enabled"] is True
+
+
+def test_admin_import_config_rejects_unsafe_yaml_tags(client):
+    # This tag is accepted by `yaml.load(..., Loader=FullLoader)` on PyYAML 5.3.1,
+    # but must be rejected for untrusted input.
+    r = client.post(
+        "/admin/import-config",
+        data='!!python/object/new:builtins.str ["pwned"]\n',
+        headers=_admin_headers(),
+    )
+    assert r.status_code == 400, r.text
+    assert "unsafe" in r.json()["detail"]
+
+
+def test_admin_import_config_rejects_large_payloads(client):
+    # Ensure the endpoint doesn't buffer arbitrarily large YAML bodies.
+    oversized = "a" * (1_048_576 + 1)
+    r = client.post(
+        "/admin/import-config",
+        data=oversized,
+        headers=_admin_headers(),
+    )
+    assert r.status_code == 413, r.text
