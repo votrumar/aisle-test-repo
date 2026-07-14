@@ -58,8 +58,38 @@ async def import_sensor_config(request: Request, db: Session = Depends(get_db)) 
     return {"accepted": accepted}
 
 
+_MAX_CONFIG_IMPORT_BYTES = 1_048_576  # 1 MiB
+
+
+async def _read_limited_body(request: Request, max_bytes: int) -> bytes:
+    total = 0
+    chunks: list[bytes] = []
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(status_code=413, detail="payload too large")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 @router.post("/import-config")
 async def import_config(request: Request) -> dict:
-    yaml_text = (await request.body()).decode("utf-8")
-    parsed = import_alert_rules(yaml_text)
+    content_length = request.headers.get("content-length")
+    if content_length is not None:
+        try:
+            if int(content_length) > _MAX_CONFIG_IMPORT_BYTES:
+                raise HTTPException(status_code=413, detail="payload too large")
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="invalid content-length") from exc
+
+    body = await _read_limited_body(request, _MAX_CONFIG_IMPORT_BYTES)
+    try:
+        yaml_text = body.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(status_code=400, detail="request body must be valid UTF-8") from exc
+
+    try:
+        parsed = import_alert_rules(yaml_text)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     return {"parsed": parsed}

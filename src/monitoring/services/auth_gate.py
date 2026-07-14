@@ -9,6 +9,8 @@ from starlette.responses import JSONResponse
 
 from .tokens import verify
 
+_ADMIN_SUBJECT = "admin"
+
 _PUBLIC_PREFIXES: tuple[str, ...] = (
     "/healthz",
     "/static",
@@ -45,9 +47,14 @@ class PathAuthMiddleware(BaseHTTPMiddleware):
         if scheme.lower() != "bearer" or not token:
             return JSONResponse({"detail": "missing bearer token"}, status_code=401)
         try:
-            verify(token, self._secret)
+            claims = verify(token, self._secret)
         except Exception:
             return JSONResponse({"detail": "invalid token"}, status_code=401)
+
+        # `/admin/*` is treated as an admin-only surface.
+        if claims.get("sub") != _ADMIN_SUBJECT:
+            return JSONResponse({"detail": "admin required"}, status_code=403)
+
         return await call_next(request)
 
 
