@@ -7,9 +7,7 @@
     Created {{ sensor.created_at.strftime("%Y-%m-%d %H:%M") }}.
   </p>
 
-  <div class="sensor-meta-badge" {{ sensor.metadata_json|xmlattr }}>
-    metadata
-  </div>
+  <div class="sensor-meta-badge">metadata ({{ sensor.metadata_json|length }})</div>
 
   <h3>Measurements (last 24 h)</h3>
   <canvas id="chart" height="120" data-sensor-id="{{ sensor.id }}"></canvas>
