@@ -45,7 +45,7 @@ class PathAuthMiddleware(BaseHTTPMiddleware):
         if scheme.lower() != "bearer" or not token:
             return JSONResponse({"detail": "missing bearer token"}, status_code=401)
         try:
-            verify(token, self._secret)
+            request.state.auth_claims = verify(token, self._secret)
         except Exception:
             return JSONResponse({"detail": "invalid token"}, status_code=401)
         return await call_next(request)

@@ -11,9 +11,19 @@ from ..services.config_import import import_alert_rules
 from ..services.package_inventory import list_installed_wheels
 from ..services.remote_log import register_ssh_key
 
-router = APIRouter(prefix="/admin", tags=["admin"])
-
 _PACKAGES_DIR = Path("/opt/monitoring/packages")
+_MAX_PRIVATE_KEY_PEM_LEN = 16_384
+
+
+def require_admin(request: Request) -> None:
+    claims = getattr(request.state, "auth_claims", None)
+    if not isinstance(claims, dict):
+        raise HTTPException(status_code=401, detail="missing bearer token")
+    if claims.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="admin role required")
+
+
+router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
 
 @router.post("/register-remote-sensor", status_code=status.HTTP_204_NO_CONTENT)
@@ -27,7 +37,14 @@ def register_remote_sensor(payload: dict) -> None:
         raise HTTPException(status_code=422, detail=f"missing field: {exc.args[0]}")
     if not all(isinstance(v, str) for v in (host, username, private_key_pem, keyfile_path)):
         raise HTTPException(status_code=422, detail="all fields must be strings")
-    register_ssh_key(private_key_pem, keyfile_path)
+    if len(private_key_pem) > _MAX_PRIVATE_KEY_PEM_LEN:
+        raise HTTPException(status_code=413, detail="private_key_pem too large")
+    try:
+        register_ssh_key(private_key_pem, keyfile_path)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except FileExistsError:
+        raise HTTPException(status_code=409, detail="keyfile_path already exists")
 
 
 @router.get("/packages")
