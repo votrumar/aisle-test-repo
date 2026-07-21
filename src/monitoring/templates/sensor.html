@@ -7,9 +7,22 @@
     Created {{ sensor.created_at.strftime("%Y-%m-%d %H:%M") }}.
   </p>
 
-  <div class="sensor-meta-badge" {{ sensor.metadata_json|xmlattr }}>
-    metadata
-  </div>
+  <h3>Metadata</h3>
+  {% if sensor.metadata_json %}
+    <table>
+      <thead><tr><th>Key</th><th>Value</th></tr></thead>
+      <tbody>
+        {% for key, value in sensor.metadata_json.items() %}
+          <tr>
+            <td><code>{{ key }}</code></td>
+            <td>{{ value }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">No metadata for this sensor.</p>
+  {% endif %}
 
   <h3>Measurements (last 24 h)</h3>
   <canvas id="chart" height="120" data-sensor-id="{{ sensor.id }}"></canvas>

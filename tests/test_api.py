@@ -139,3 +139,22 @@ def test_sensor_view_renders(client):
     r = client.get(f"/sensors/{sensor['id']}/view")
     assert r.status_code == 200
     assert "chart-me" in r.text
+
+
+
+def test_sensor_view_renders_metadata_as_text_not_attributes(client):
+    sensor = client.post(
+        "/sensors",
+        json={
+            "name": "meta-view",
+            "metadata": {"onmouseover": "alert(1)", "label": 'cold \"storage\"'},
+        },
+    ).json()
+
+    r = client.get(f"/sensors/{sensor['id']}/view")
+    assert r.status_code == 200
+    assert "<th>Key</th><th>Value</th>" in r.text
+    assert "onmouseover" in r.text
+    assert "alert(1)" in r.text
+    assert 'onmouseover="alert(1)"' not in r.text
+    assert 'label="cold' not in r.text
