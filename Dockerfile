@@ -16,7 +16,11 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src ./src
+RUN addgroup --system monitoring \
+    && adduser --system --ingroup monitoring --home /home/monitoring monitoring \
+    && chown -R monitoring:monitoring /app
 ENV PYTHONPATH=/app/src
+USER monitoring
 
 EXPOSE 8000
 
