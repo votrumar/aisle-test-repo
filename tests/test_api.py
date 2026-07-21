@@ -1,3 +1,8 @@
+from monitoring.routers import sensors
+from monitoring.services.xml_export import sensor_to_xml
+from starlette.requests import Request
+
+
 def test_healthz(client):
     r = client.get("/healthz")
     assert r.status_code == 200
@@ -22,6 +27,43 @@ def test_duplicate_sensor_name_conflicts(client):
     client.post("/sensors", json={"name": "dup"})
     r = client.post("/sensors", json={"name": "dup"})
     assert r.status_code == 409
+
+
+
+def test_sensor_xml_import_uses_stream_instead_of_request_body(client, monkeypatch):
+    async def fail_body(self):
+        raise AssertionError("request.body() should not be used for XML imports")
+
+    monkeypatch.setattr(Request, "body", fail_body)
+
+    xml = sensor_to_xml("streamed-sensor", "warehouse-B")
+    r = client.post("/sensors/import-xml", content=xml, headers={"content-type": "application/xml"})
+    assert r.status_code == 201, r.text
+    assert r.json()["name"] == "streamed-sensor"
+    assert r.json()["location"] == "warehouse-B"
+
+
+
+def test_sensor_xml_import_closes_connection_on_oversized_streams(client, monkeypatch):
+    async def fail_body(self):
+        raise AssertionError("request.body() should not be used for XML imports")
+
+    consumed = {"extra_chunk": False}
+
+    async def oversized_stream(self):
+        yield b"x" * sensors._MAX_XML_BYTES
+        yield b"y"
+        consumed["extra_chunk"] = True
+        yield b"z"
+
+    monkeypatch.setattr(Request, "body", fail_body)
+    monkeypatch.setattr(Request, "stream", oversized_stream)
+
+    r = client.post("/sensors/import-xml", content=b"ignored", headers={"content-type": "application/xml"})
+    assert r.status_code == 413
+    assert r.json() == {"detail": "xml body too large"}
+    assert consumed["extra_chunk"] is False
+    assert r.headers["connection"] == "close"
 
 
 def test_measurement_triggers_alert(client):
