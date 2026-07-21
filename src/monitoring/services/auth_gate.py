@@ -9,6 +9,11 @@ from starlette.responses import JSONResponse
 
 from .tokens import verify
 
+
+def get_auth_secret() -> str | None:
+    secret = os.environ.get("MONITORING_AUTH_SECRET", "").strip()
+    return secret or None
+
 _PUBLIC_PREFIXES: tuple[str, ...] = (
     "/healthz",
     "/static",
@@ -27,7 +32,7 @@ def _matches_any(path: str, prefixes: Iterable[str]) -> bool:
 
 
 class PathAuthMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, secret: str) -> None:
+    def __init__(self, app, secret: str | None) -> None:
         super().__init__(app)
         self._secret = secret
 
@@ -39,6 +44,9 @@ class PathAuthMiddleware(BaseHTTPMiddleware):
 
         if not _matches_any(path, _PROTECTED_PREFIXES):
             return await call_next(request)
+
+        if not self._secret:
+            return JSONResponse({"detail": "admin auth is not configured"}, status_code=503)
 
         auth = request.headers.get("authorization", "")
         scheme, _, token = auth.partition(" ")
@@ -52,5 +60,4 @@ class PathAuthMiddleware(BaseHTTPMiddleware):
 
 
 def build_middleware(app) -> PathAuthMiddleware:
-    secret = os.environ.get("MONITORING_AUTH_SECRET", "dev-secret")
-    return PathAuthMiddleware(app, secret=secret)
+    return PathAuthMiddleware(app, secret=get_auth_secret())
