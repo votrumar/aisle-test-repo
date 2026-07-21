@@ -139,3 +139,94 @@ def test_sensor_view_renders(client):
     r = client.get(f"/sensors/{sensor['id']}/view")
     assert r.status_code == 200
     assert "chart-me" in r.text
+
+
+def test_admin_import_config_accepts_rule_list(client, admin_headers):
+    yaml_body = """
+    - name: too-hot
+      sensor_id: 7
+      metric: temperature
+      comparator: gt
+      threshold: 10
+    """
+
+    r = client.post(
+        "/admin/import-config",
+        content=yaml_body,
+        headers={**admin_headers, "content-type": "application/x-yaml"},
+    )
+
+    assert r.status_code == 200, r.text
+    assert r.json() == {
+        "parsed": {
+            "rules": [
+                {
+                    "name": "too-hot",
+                    "sensor_id": 7,
+                    "metric": "temperature",
+                    "comparator": "gt",
+                    "threshold": 10.0,
+                    "enabled": True,
+                }
+            ]
+        }
+    }
+
+
+def test_admin_import_config_rejects_python_yaml_tags(client, admin_headers):
+    r = client.post(
+        "/admin/import-config",
+        content="!!python/tuple [1, 2]",
+        headers={**admin_headers, "content-type": "application/x-yaml"},
+    )
+
+    assert r.status_code == 422
+    assert r.json() == {"detail": "invalid alert rule config"}
+
+
+def test_admin_import_config_rejects_yaml_aliases(client, admin_headers):
+    yaml_body = """
+    - &rule
+      name: too-hot
+      sensor_id: 7
+      metric: temperature
+      comparator: gt
+      threshold: 10
+    - *rule
+    """
+
+    r = client.post(
+        "/admin/import-config",
+        content=yaml_body,
+        headers={**admin_headers, "content-type": "application/x-yaml"},
+    )
+
+    assert r.status_code == 422
+    assert r.json() == {"detail": "invalid alert rule config"}
+
+
+def test_admin_import_config_rejects_overly_complex_documents(client, admin_headers):
+    yaml_body = "\n".join(
+        f"- name: rule-{i}\n  metric: temperature\n  comparator: gt\n  threshold: 10"
+        for i in range(2_500)
+    )
+
+    r = client.post(
+        "/admin/import-config",
+        content=yaml_body,
+        headers={**admin_headers, "content-type": "application/x-yaml"},
+    )
+
+    assert r.status_code == 422
+    assert r.json() == {"detail": "invalid alert rule config"}
+
+
+def test_admin_import_config_rejects_large_payload(client, admin_headers):
+    r = client.post(
+        "/admin/import-config",
+        content="a" * 1_048_577,
+        headers={**admin_headers, "content-type": "application/x-yaml"},
+    )
+
+    assert r.status_code == 413
+    assert r.json() == {"detail": "config payload too large"}

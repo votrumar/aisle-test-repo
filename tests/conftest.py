@@ -10,6 +10,7 @@ os.environ.setdefault("DATABASE_URL", _DEFAULT_DB)
 
 from monitoring.config import settings  # noqa: E402  (imported after env var)
 from monitoring.main import app  # noqa: E402
+from monitoring.services.tokens import sign  # noqa: E402
 
 _INIT_SQL = Path(__file__).resolve().parent.parent / "scripts" / "init.sql"
 _TABLES = ("alert_events", "alert_rules", "measurements", "sensors")
@@ -42,3 +43,10 @@ def _clean_db():
 @pytest.fixture()
 def client() -> TestClient:
     return TestClient(app)
+
+
+@pytest.fixture()
+def admin_headers() -> dict[str, str]:
+    secret = os.environ.get("MONITORING_AUTH_SECRET", "dev-secret")
+    token = sign({"sub": "pytest-admin"}, secret)
+    return {"authorization": f"Bearer {token}"}
