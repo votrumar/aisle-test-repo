@@ -9,7 +9,7 @@ from ..db import get_db
 from ..models import Sensor
 from ..services.config_import import import_alert_rules
 from ..services.package_inventory import list_installed_wheels
-from ..services.remote_log import register_ssh_key
+from ..services.remote_log import RemoteSensorKeyError, register_ssh_key
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -22,12 +22,15 @@ def register_remote_sensor(payload: dict) -> None:
         host = payload["host"]
         username = payload["username"]
         private_key_pem = payload["private_key_pem"]
-        keyfile_path = payload["keyfile_path"]
     except KeyError as exc:
         raise HTTPException(status_code=422, detail=f"missing field: {exc.args[0]}")
-    if not all(isinstance(v, str) for v in (host, username, private_key_pem, keyfile_path)):
+    if not all(isinstance(v, str) for v in (host, username, private_key_pem)):
         raise HTTPException(status_code=422, detail="all fields must be strings")
-    register_ssh_key(private_key_pem, keyfile_path)
+    try:
+        register_ssh_key(private_key_pem, host, username)
+    except RemoteSensorKeyError as exc:
+        detail = exc.detail if exc.status_code < 500 else "remote sensor key storage is unavailable"
+        raise HTTPException(status_code=exc.status_code, detail=detail) from exc
 
 
 @router.get("/packages")
