@@ -1,3 +1,5 @@
+import math
+
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
@@ -22,6 +24,8 @@ def evaluate_measurement(db: Session, measurement: Measurement) -> list[AlertEve
 
     events: list[AlertEvent] = []
     for rule in rules:
+        if not math.isfinite(rule.threshold):
+            continue
         if _COMPARATORS[rule.comparator](measurement.value, rule.threshold):
             events.append(
                 AlertEvent(
