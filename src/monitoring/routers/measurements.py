@@ -1,3 +1,4 @@
+import math
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -57,4 +58,4 @@ def list_measurements(
     if until is not None:
         stmt = stmt.where(Measurement.recorded_at <= until)
     stmt = stmt.order_by(Measurement.recorded_at.desc()).limit(limit)
-    return list(db.scalars(stmt).all())
+    return [measurement for measurement in db.scalars(stmt).all() if math.isfinite(measurement.value)]
