@@ -2,8 +2,8 @@
 
 FastAPI service for ingesting sensor measurements (temperature, humidity, …),
 evaluating threshold alerts on write, and viewing recent data in a built-in
-Jinja2 + Chart.js dashboard. Backed by Postgres. No authentication — the API
-and dashboard are public.
+Jinja2 + Chart.js dashboard. Backed by Postgres. Dashboard and read APIs are
+public, while `POST /measurements` requires a sensor-scoped bearer token.
 
 ## Stack
 
@@ -72,8 +72,10 @@ curl -X POST http://localhost:8000/alert-rules \
   -d '{"name":"too-hot","sensor_id":1,"metric":"temperature","comparator":"gt","threshold":-15}'
 
 # Submit a measurement (will trigger the rule)
+# DEVICE_TOKEN must be signed with JWT_SECRET and scoped to sensor 1
 curl -X POST http://localhost:8000/measurements \
   -H 'content-type: application/json' \
+  -H "Authorization: Bearer $DEVICE_TOKEN" \
   -d '{"sensor_id":1,"metric":"temperature","value":-10,"unit":"C"}'
 
 # Inspect triggered alerts
