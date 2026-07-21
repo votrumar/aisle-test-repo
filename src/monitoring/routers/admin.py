@@ -14,6 +14,16 @@ from ..services.remote_log import register_ssh_key
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 _PACKAGES_DIR = Path("/opt/monitoring/packages")
+_MAX_CONFIG_IMPORT_BYTES = 1_048_576
+
+
+async def _read_limited_body(request: Request, max_bytes: int) -> bytes:
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > max_bytes:
+            raise HTTPException(status_code=413, detail="config payload too large")
+    return bytes(body)
 
 
 @router.post("/register-remote-sensor", status_code=status.HTTP_204_NO_CONTENT)
@@ -60,6 +70,14 @@ async def import_sensor_config(request: Request, db: Session = Depends(get_db)) 
 
 @router.post("/import-config")
 async def import_config(request: Request) -> dict:
-    yaml_text = (await request.body()).decode("utf-8")
-    parsed = import_alert_rules(yaml_text)
+    body = await _read_limited_body(request, _MAX_CONFIG_IMPORT_BYTES)
+    try:
+        yaml_text = body.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(status_code=422, detail="config payload must be valid UTF-8") from exc
+
+    try:
+        parsed = import_alert_rules(yaml_text)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return {"parsed": parsed}
