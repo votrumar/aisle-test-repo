@@ -7,6 +7,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     func,
@@ -52,6 +53,7 @@ class AlertRule(Base):
     __tablename__ = "alert_rules"
     __table_args__ = (
         CheckConstraint("comparator IN ('gt','gte','lt','lte')", name="alert_rules_comparator_chk"),
+        Index("ix_alert_rules_enabled_metric_sensor", "enabled", "metric", "sensor_id", "id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

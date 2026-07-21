@@ -29,8 +29,12 @@ def create_measurement(payload: MeasurementCreate, db: Session = Depends(get_db)
     db.add(measurement)
     db.flush()
 
-    events = evaluate_measurement(db, measurement)
-    db.commit()
+    try:
+        events = evaluate_measurement(db, measurement)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(measurement)
     for ev in events:
         db.refresh(ev)
