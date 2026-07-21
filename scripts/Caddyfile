@@ -5,6 +5,9 @@
 # canonical request to the upstream, and overrides TE/CL with values
 # it controls.
 :8000 {
+    request_body {
+        max_size 2MB
+    }
     request_header -Transfer-Encoding
     reverse_proxy api:8000 {
         header_up -Transfer-Encoding
