@@ -33,6 +33,13 @@ class Sensor(Base):
 
 class Measurement(Base):
     __tablename__ = "measurements"
+    __table_args__ = (
+        CheckConstraint(
+            "value != 'NaN'::double precision AND value != 'Infinity'::double precision "
+            "AND value != '-Infinity'::double precision",
+            name="measurements_value_finite_chk",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     sensor_id: Mapped[int] = mapped_column(

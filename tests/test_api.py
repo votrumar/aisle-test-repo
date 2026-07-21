@@ -58,6 +58,38 @@ def test_measurement_triggers_alert(client):
     assert len(events) == 1
 
 
+def test_measurement_rejects_non_finite_values(client):
+    sensor = client.post("/sensors", json={"name": "freezer-non-finite"}).json()
+    client.post(
+        "/alert-rules",
+        json={
+            "name": "too-hot",
+            "sensor_id": sensor["id"],
+            "metric": "temperature",
+            "comparator": "gt",
+            "threshold": 10.0,
+        },
+    )
+
+    for raw_value in ("NaN", "Infinity", "-Infinity"):
+        response = client.post(
+            "/measurements",
+            content=(
+                "{"
+                f'"sensor_id": {sensor["id"]}, '
+                '"metric": "temperature", '
+                f'"value": {raw_value}, '
+                '"unit": "C"'
+                "}"
+            ),
+            headers={"content-type": "application/json"},
+        )
+        assert response.status_code == 422
+
+    assert client.get(f"/measurements?sensor_id={sensor['id']}").json() == []
+    assert client.get("/alert-events").json() == []
+
+
 def test_measurements_query_filters(client):
     sensor = client.post("/sensors", json={"name": "freezer-3"}).json()
     for value in (1.0, 2.0, 3.0):

@@ -2,7 +2,7 @@ import re
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, model_validator
 
 Comparator = Literal["gt", "gte", "lt", "lte"]
 
@@ -45,7 +45,7 @@ class SensorOut(BaseModel):
 class MeasurementCreate(BaseModel):
     sensor_id: int
     metric: str = Field(min_length=1, max_length=100)
-    value: float
+    value: FiniteFloat
     unit: str = Field(min_length=1, max_length=20)
     recorded_at: datetime | None = None
 

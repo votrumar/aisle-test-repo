@@ -22,6 +22,20 @@ CREATE INDEX IF NOT EXISTS ix_measurements_sensor_time
 CREATE INDEX IF NOT EXISTS ix_measurements_metric_time
     ON measurements (metric, recorded_at DESC);
 
+DELETE FROM measurements
+WHERE value IN ('NaN'::DOUBLE PRECISION, 'Infinity'::DOUBLE PRECISION, '-Infinity'::DOUBLE PRECISION);
+
+ALTER TABLE measurements
+    DROP CONSTRAINT IF EXISTS measurements_value_finite_chk;
+
+ALTER TABLE measurements
+    ADD CONSTRAINT measurements_value_finite_chk
+    CHECK (
+        value != 'NaN'::DOUBLE PRECISION
+        AND value != 'Infinity'::DOUBLE PRECISION
+        AND value != '-Infinity'::DOUBLE PRECISION
+    );
+
 CREATE TABLE IF NOT EXISTS alert_rules (
     id          SERIAL PRIMARY KEY,
     name        TEXT NOT NULL,
