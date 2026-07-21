@@ -15,6 +15,35 @@ router = APIRouter(prefix="/sensors", tags=["sensors"])
 _MAX_XML_BYTES = 64 * 1024
 
 
+async def _read_limited_body(request: Request, max_bytes: int) -> bytes:
+    content_length = request.headers.get("content-length")
+    if content_length is not None:
+        try:
+            if int(content_length) > max_bytes:
+                raise HTTPException(
+                    status_code=413,
+                    detail="xml body too large",
+                    headers={"Connection": "close"},
+                )
+        except ValueError:
+            pass
+
+    body = bytearray()
+    total = 0
+    async for chunk in request.stream():
+        if not chunk:
+            continue
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail="xml body too large",
+                headers={"Connection": "close"},
+            )
+        body.extend(chunk)
+    return bytes(body)
+
+
 def _to_out(sensor: Sensor) -> SensorOut:
     return SensorOut(
         id=sensor.id,
@@ -57,9 +86,7 @@ def get_sensor(sensor_id: int, db: Session = Depends(get_db)) -> SensorOut:
 
 @router.post("/import-xml", response_model=SensorOut, status_code=status.HTTP_201_CREATED)
 async def import_sensor_xml(request: Request, db: Session = Depends(get_db)) -> SensorOut:
-    body = await request.body()
-    if len(body) > _MAX_XML_BYTES:
-        raise HTTPException(status_code=413, detail="xml body too large")
+    body = await _read_limited_body(request, _MAX_XML_BYTES)
     try:
         fields = parse_sensor_xml(body)
     except ValueError as exc:
