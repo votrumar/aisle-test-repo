@@ -13,6 +13,9 @@ _REMOTE_SENSOR_KEYS_DIR = Path(
 _INVALID_PATH_SEGMENTS = {"", ".", ".."}
 _MAX_KEYFILE_PATH_LEN = 255
 _MAX_KEYFILE_PATH_DEPTH = 8
+# The confinement logic relies on opening directories and the final file without
+# following symlinks. If the platform cannot enforce those flags, key storage is
+# disabled rather than silently weakening the boundary.
 _REQUIRED_OPEN_FLAGS = ("O_DIRECTORY", "O_NOFOLLOW")
 _MISSING_OPEN_FLAGS = tuple(name for name in _REQUIRED_OPEN_FLAGS if not hasattr(os, name))
 if _MISSING_OPEN_FLAGS:
@@ -28,6 +31,8 @@ def init_ssh_logging(log_path: Path, *, level: int = 20) -> None:
 
 
 def _validated_keyfile_parts(keyfile_path: str) -> tuple[str, ...]:
+    # Keep client-controlled paths simple and bounded before any filesystem or
+    # key-parsing work happens.
     if len(keyfile_path) > _MAX_KEYFILE_PATH_LEN:
         raise ValueError("keyfile_path too long")
 
@@ -44,6 +49,8 @@ def _validated_keyfile_parts(keyfile_path: str) -> tuple[str, ...]:
 
 
 def _assert_private_dir(fd: int, *, path_hint: Path) -> None:
+    # Existing directories are reused only when they remain private to the
+    # service account; otherwise a local user could tamper with key management.
     details = os.fstat(fd)
     if not stat.S_ISDIR(details.st_mode):
         raise NotADirectoryError(f"{path_hint} is not a directory")
@@ -66,6 +73,8 @@ def _open_confined_keyfile(parts: tuple[str, ...]) -> int:
     current_path = _REMOTE_SENSOR_KEYS_DIR
     try:
         _assert_private_dir(current_fd, path_hint=current_path)
+        # Walk one component at a time so every intermediate directory is both
+        # inside the trusted tree and verified before descending further.
         for part in parts[:-1]:
             try:
                 os.mkdir(part, 0o700, dir_fd=current_fd)
@@ -101,6 +110,8 @@ def _open_confined_keyfile(parts: tuple[str, ...]) -> int:
 
 
 def register_ssh_key(private_key_pem: str, keyfile_path: str) -> None:
+    # Validate the path before parsing the PEM so obviously bad requests fail
+    # fast and do not spend time inside Paramiko.
     parts = _validated_keyfile_parts(keyfile_path)
     key = paramiko.RSAKey.from_private_key(StringIO(private_key_pem))
     fd = _open_confined_keyfile(parts)

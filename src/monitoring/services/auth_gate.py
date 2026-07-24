@@ -45,6 +45,8 @@ class PathAuthMiddleware(BaseHTTPMiddleware):
         if scheme.lower() != "bearer" or not token:
             return JSONResponse({"detail": "missing bearer token"}, status_code=401)
         try:
+            # Downstream admin dependencies reuse the verified claims instead of
+            # reparsing the bearer token at each route.
             request.state.auth_claims = verify(token, self._secret)
         except Exception:
             return JSONResponse({"detail": "invalid token"}, status_code=401)

@@ -16,6 +16,8 @@ _MAX_PRIVATE_KEY_PEM_LEN = 16_384
 
 
 def require_admin(request: Request) -> None:
+    # Authentication happens in middleware; this dependency enforces the
+    # authorization boundary for sensitive admin routes.
     claims = getattr(request.state, "auth_claims", None)
     if not isinstance(claims, dict):
         raise HTTPException(status_code=401, detail="missing bearer token")
@@ -37,6 +39,7 @@ def register_remote_sensor(payload: dict) -> None:
         raise HTTPException(status_code=422, detail=f"missing field: {exc.args[0]}")
     if not all(isinstance(v, str) for v in (host, username, private_key_pem, keyfile_path)):
         raise HTTPException(status_code=422, detail="all fields must be strings")
+    # Bound PEM size before handing attacker-controlled input to Paramiko.
     if len(private_key_pem) > _MAX_PRIVATE_KEY_PEM_LEN:
         raise HTTPException(status_code=413, detail="private_key_pem too large")
     try:
