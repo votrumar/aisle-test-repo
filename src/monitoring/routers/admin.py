@@ -7,7 +7,7 @@ from werkzeug.formparser import parse_form_data
 
 from ..db import get_db
 from ..models import Sensor
-from ..services.config_import import import_alert_rules
+from ..services.config_import import import_alert_rules, import_binary_alert_rules
 from ..services.package_inventory import list_installed_wheels
 from ..services.remote_log import register_ssh_key
 
@@ -62,4 +62,10 @@ async def import_sensor_config(request: Request, db: Session = Depends(get_db)) 
 async def import_config(request: Request) -> dict:
     yaml_text = (await request.body()).decode("utf-8")
     parsed = import_alert_rules(yaml_text)
+    return {"parsed": parsed}
+
+
+@router.post("/import-binary-config")
+async def import_binary_config(request: Request) -> dict:
+    parsed = import_binary_alert_rules(await request.body())
     return {"parsed": parsed}
