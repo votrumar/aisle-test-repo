@@ -108,3 +108,8 @@ Or, against the docker-compose stack:
 docker compose up -d db
 DATABASE_URL=postgresql+psycopg://monitoring:monitoring@localhost:5432/monitoring pytest
 ```
+
+## Development workflow
+
+For push-event integration checks, use documentation-only commits so the
+application code and dependency versions remain unchanged.
