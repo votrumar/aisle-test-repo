@@ -117,3 +117,5 @@ application code and dependency versions remain unchanged.
 Validation marker: incremental analyzer waiting check on 2026-09-15.
 
 Validation marker: analyzer-enabled incremental waiting check on 2026-09-15.
+
+Validation marker: incremental analyzer queueing check on 2026-09-15.
