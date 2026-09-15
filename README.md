@@ -113,3 +113,5 @@ DATABASE_URL=postgresql+psycopg://monitoring:monitoring@localhost:5432/monitorin
 
 For push-event integration checks, use documentation-only commits so the
 application code and dependency versions remain unchanged.
+
+Validation marker: incremental analyzer waiting check on 2026-09-15.
