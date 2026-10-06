@@ -1,3 +1,5 @@
+import math
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -19,4 +21,4 @@ def list_events(
     if sensor_id is not None:
         stmt = stmt.where(AlertEvent.sensor_id == sensor_id)
     stmt = stmt.order_by(AlertEvent.triggered_at.desc()).limit(limit)
-    return list(db.scalars(stmt).all())
+    return [event for event in db.scalars(stmt).all() if math.isfinite(event.value)]
