@@ -32,6 +32,8 @@ CREATE TABLE IF NOT EXISTS alert_rules (
     enabled     BOOLEAN NOT NULL DEFAULT TRUE,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE INDEX IF NOT EXISTS ix_alert_rules_enabled_metric_sensor
+    ON alert_rules (enabled, metric, sensor_id, id);
 
 CREATE TABLE IF NOT EXISTS alert_events (
     id              BIGSERIAL PRIMARY KEY,

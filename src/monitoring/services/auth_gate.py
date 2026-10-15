@@ -21,9 +21,20 @@ _PROTECTED_PREFIXES: tuple[str, ...] = (
     "/admin",
 )
 
+_PROTECTED_METHOD_PREFIXES: tuple[tuple[str, str], ...] = (
+    ("POST", "/measurements"),
+    ("POST", "/alert-rules"),
+    ("PATCH", "/alert-rules"),
+    ("DELETE", "/alert-rules"),
+)
+
 
 def _matches_any(path: str, prefixes: Iterable[str]) -> bool:
     return any(path == p or path.startswith(p + "/") for p in prefixes)
+
+
+def _matches_method_prefix(method: str, path: str, method_prefixes: Iterable[tuple[str, str]]) -> bool:
+    return any(method == allowed_method and (path == prefix or path.startswith(prefix + "/")) for allowed_method, prefix in method_prefixes)
 
 
 class PathAuthMiddleware(BaseHTTPMiddleware):
@@ -37,7 +48,11 @@ class PathAuthMiddleware(BaseHTTPMiddleware):
         if _matches_any(path, _PUBLIC_PREFIXES):
             return await call_next(request)
 
-        if not _matches_any(path, _PROTECTED_PREFIXES):
+        if not _matches_any(path, _PROTECTED_PREFIXES) and not _matches_method_prefix(
+            request.method,
+            path,
+            _PROTECTED_METHOD_PREFIXES,
+        ):
             return await call_next(request)
 
         auth = request.headers.get("authorization", "")

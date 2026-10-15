@@ -2,8 +2,10 @@
 
 FastAPI service for ingesting sensor measurements (temperature, humidity, …),
 evaluating threshold alerts on write, and viewing recent data in a built-in
-Jinja2 + Chart.js dashboard. Backed by Postgres. No authentication — the API
-and dashboard are public.
+Jinja2 + Chart.js dashboard. Backed by Postgres. The dashboard and existing
+sensor-management endpoints remain public, while alert-rule mutation and
+measurement ingestion require a bearer token signed with
+`MONITORING_AUTH_SECRET`.
 
 ## Stack
 
@@ -61,6 +63,13 @@ uvicorn monitoring.main:app --reload
 ## API quick tour
 
 ```bash
+AUTH_TOKEN=$(python - <<'PY'
+import os
+from monitoring.services.tokens import sign
+print(sign({'sub': 'demo'}, os.environ.get('MONITORING_AUTH_SECRET', 'dev-secret')))
+PY
+)
+
 # Create a sensor
 curl -X POST http://localhost:8000/sensors \
   -H 'content-type: application/json' \
@@ -68,11 +77,13 @@ curl -X POST http://localhost:8000/sensors \
 
 # Create an alert rule (fire when temperature > -15 C)
 curl -X POST http://localhost:8000/alert-rules \
+  -H "authorization: Bearer $AUTH_TOKEN" \
   -H 'content-type: application/json' \
   -d '{"name":"too-hot","sensor_id":1,"metric":"temperature","comparator":"gt","threshold":-15}'
 
 # Submit a measurement (will trigger the rule)
 curl -X POST http://localhost:8000/measurements \
+  -H "authorization: Bearer $AUTH_TOKEN" \
   -H 'content-type: application/json' \
   -d '{"sensor_id":1,"metric":"temperature","value":-10,"unit":"C"}'
 
