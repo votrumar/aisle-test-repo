@@ -52,6 +52,10 @@ class AlertRule(Base):
     __tablename__ = "alert_rules"
     __table_args__ = (
         CheckConstraint("comparator IN ('gt','gte','lt','lte')", name="alert_rules_comparator_chk"),
+        CheckConstraint(
+            "threshold::text NOT IN ('NaN', 'Infinity', '-Infinity')",
+            name="alert_rules_threshold_finite_chk",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

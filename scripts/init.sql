@@ -27,11 +27,30 @@ CREATE TABLE IF NOT EXISTS alert_rules (
     name        TEXT NOT NULL,
     sensor_id   INTEGER REFERENCES sensors(id) ON DELETE CASCADE,
     metric      TEXT NOT NULL,
-    comparator  TEXT NOT NULL CHECK (comparator IN ('gt', 'gte', 'lt', 'lte')),
-    threshold   DOUBLE PRECISION NOT NULL,
+    comparator  TEXT NOT NULL CONSTRAINT alert_rules_comparator_chk
+                CHECK (comparator IN ('gt', 'gte', 'lt', 'lte')),
+    threshold   DOUBLE PRECISION NOT NULL CONSTRAINT alert_rules_threshold_finite_chk
+                CHECK (threshold::TEXT NOT IN ('NaN', 'Infinity', '-Infinity')),
     enabled     BOOLEAN NOT NULL DEFAULT TRUE,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        WHERE c.conname = 'alert_rules_threshold_finite_chk'
+          AND t.relname = 'alert_rules'
+          AND n.nspname = current_schema()
+    ) THEN
+        ALTER TABLE ONLY alert_rules
+            ADD CONSTRAINT alert_rules_threshold_finite_chk
+            CHECK (threshold::TEXT NOT IN ('NaN', 'Infinity', '-Infinity')) NOT VALID;
+    END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS alert_events (
     id              BIGSERIAL PRIMARY KEY,

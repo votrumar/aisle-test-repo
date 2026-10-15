@@ -2,7 +2,7 @@ import re
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, model_validator
 
 Comparator = Literal["gt", "gte", "lt", "lte"]
 
@@ -66,13 +66,13 @@ class AlertRuleCreate(BaseModel):
     sensor_id: int | None = None
     metric: str = Field(min_length=1, max_length=100)
     comparator: Comparator
-    threshold: float
+    threshold: FiniteFloat
     enabled: bool = True
 
 
 class AlertRuleUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
-    threshold: float | None = None
+    threshold: FiniteFloat | None = None
     enabled: bool | None = None
 
 
@@ -84,7 +84,7 @@ class AlertRuleOut(BaseModel):
     sensor_id: int | None
     metric: str
     comparator: Comparator
-    threshold: float
+    threshold: FiniteFloat
     enabled: bool
     created_at: datetime
 

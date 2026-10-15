@@ -1,3 +1,5 @@
+import math
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -7,6 +9,17 @@ from ..models import AlertRule, Sensor
 from ..schemas import AlertRuleCreate, AlertRuleOut, AlertRuleUpdate
 
 router = APIRouter(prefix="/alert-rules", tags=["alert-rules"])
+
+_NON_FINITE_THRESHOLD_DETAIL = (
+    "alert rule has a non-finite threshold; patch threshold with a finite value to repair it"
+)
+
+
+def _has_finite_threshold(rule: AlertRule) -> bool:
+    try:
+        return math.isfinite(rule.threshold)
+    except (TypeError, ValueError):
+        return False
 
 
 @router.post("", response_model=AlertRuleOut, status_code=status.HTTP_201_CREATED)
@@ -29,7 +42,8 @@ def create_rule(payload: AlertRuleCreate, db: Session = Depends(get_db)) -> Aler
 
 @router.get("", response_model=list[AlertRuleOut])
 def list_rules(db: Session = Depends(get_db)) -> list[AlertRule]:
-    return list(db.scalars(select(AlertRule).order_by(AlertRule.id)).all())
+    rules = db.scalars(select(AlertRule).order_by(AlertRule.id)).all()
+    return [rule for rule in rules if _has_finite_threshold(rule)]
 
 
 @router.patch("/{rule_id}", response_model=AlertRuleOut)
@@ -38,6 +52,8 @@ def update_rule(rule_id: int, payload: AlertRuleUpdate, db: Session = Depends(ge
     if rule is None:
         raise HTTPException(status_code=404, detail="alert rule not found")
     data = payload.model_dump(exclude_unset=True)
+    if "threshold" not in data and not _has_finite_threshold(rule):
+        raise HTTPException(status_code=409, detail=_NON_FINITE_THRESHOLD_DETAIL)
     for key, value in data.items():
         setattr(rule, key, value)
     db.commit()
