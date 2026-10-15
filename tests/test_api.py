@@ -1,3 +1,27 @@
+from io import StringIO
+
+import paramiko
+
+from monitoring.services import remote_log, tokens
+
+
+def _admin_headers() -> dict[str, str]:
+    token = tokens.sign({"sub": "admin", "role": "admin"}, "dev-secret")
+    return {"authorization": f"Bearer {token}"}
+
+
+def _user_headers() -> dict[str, str]:
+    token = tokens.sign({"sub": "user", "role": "viewer"}, "dev-secret")
+    return {"authorization": f"Bearer {token}"}
+
+
+def _private_key_pem() -> str:
+    key = paramiko.RSAKey.generate(1024)
+    buffer = StringIO()
+    key.write_private_key(buffer)
+    return buffer.getvalue()
+
+
 def test_healthz(client):
     r = client.get("/healthz")
     assert r.status_code == 200
@@ -139,3 +163,95 @@ def test_sensor_view_renders(client):
     r = client.get(f"/sensors/{sensor['id']}/view")
     assert r.status_code == 200
     assert "chart-me" in r.text
+
+
+def test_register_remote_sensor_stores_key_in_confined_dir(client, monkeypatch, tmp_path):
+    key_dir = tmp_path / "remote-sensor-keys"
+    monkeypatch.setattr(remote_log, "_REMOTE_SENSOR_KEYS_DIR", key_dir)
+
+    payload = {
+        "host": "sensor-1.example.com",
+        "username": "monitor",
+        "private_key_pem": _private_key_pem(),
+        "keyfile_path": "sensor-1/id_rsa",
+    }
+
+    r = client.post("/admin/register-remote-sensor", json=payload, headers=_admin_headers())
+    assert r.status_code == 204, r.text
+
+    written = key_dir / "sensor-1" / "id_rsa"
+    assert written.exists()
+    original = written.read_text()
+    assert "BEGIN RSA PRIVATE KEY" in original
+
+    duplicate = client.post("/admin/register-remote-sensor", json=payload, headers=_admin_headers())
+    assert duplicate.status_code == 409
+    assert written.read_text() == original
+
+
+def test_register_remote_sensor_rejects_escape_paths(client, monkeypatch, tmp_path):
+    key_dir = tmp_path / "remote-sensor-keys"
+    monkeypatch.setattr(remote_log, "_REMOTE_SENSOR_KEYS_DIR", key_dir)
+    outside = tmp_path / "escape.pem"
+
+    for attempted_path in (str(outside), "../escape.pem"):
+        payload = {
+            "host": "sensor-1.example.com",
+            "username": "monitor",
+            "private_key_pem": _private_key_pem(),
+            "keyfile_path": attempted_path,
+        }
+
+        r = client.post("/admin/register-remote-sensor", json=payload, headers=_admin_headers())
+        assert r.status_code == 422
+        assert r.json()["detail"].startswith("keyfile_path")
+
+    assert not outside.exists()
+    assert not key_dir.exists()
+
+
+def test_register_remote_sensor_requires_admin_role(client):
+    payload = {
+        "host": "sensor-1.example.com",
+        "username": "monitor",
+        "private_key_pem": _private_key_pem(),
+        "keyfile_path": "sensor-1/id_rsa",
+    }
+
+    r = client.post("/admin/register-remote-sensor", json=payload, headers=_user_headers())
+    assert r.status_code == 403
+    assert r.json() == {"detail": "admin role required"}
+
+
+def test_register_remote_sensor_rejects_oversized_private_key(client, monkeypatch, tmp_path):
+    key_dir = tmp_path / "remote-sensor-keys"
+    monkeypatch.setattr(remote_log, "_REMOTE_SENSOR_KEYS_DIR", key_dir)
+
+    payload = {
+        "host": "sensor-1.example.com",
+        "username": "monitor",
+        "private_key_pem": "A" * 16_385,
+        "keyfile_path": "sensor-1/id_rsa",
+    }
+
+    r = client.post("/admin/register-remote-sensor", json=payload, headers=_admin_headers())
+    assert r.status_code == 413
+    assert r.json() == {"detail": "private_key_pem too large"}
+    assert not key_dir.exists()
+
+
+def test_register_remote_sensor_rejects_deep_key_paths(client, monkeypatch, tmp_path):
+    key_dir = tmp_path / "remote-sensor-keys"
+    monkeypatch.setattr(remote_log, "_REMOTE_SENSOR_KEYS_DIR", key_dir)
+
+    payload = {
+        "host": "sensor-1.example.com",
+        "username": "monitor",
+        "private_key_pem": _private_key_pem(),
+        "keyfile_path": "/".join(["nested"] * 9),
+    }
+
+    r = client.post("/admin/register-remote-sensor", json=payload, headers=_admin_headers())
+    assert r.status_code == 422
+    assert r.json() == {"detail": "keyfile_path too deep"}
+    assert not key_dir.exists()
