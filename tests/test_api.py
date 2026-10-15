@@ -24,6 +24,14 @@ def test_duplicate_sensor_name_conflicts(client):
     assert r.status_code == 409
 
 
+def test_sensor_create_rejects_event_handler_metadata_key(client):
+    r = client.post(
+        "/sensors",
+        json={"name": "bad-meta", "metadata": {"onmouseover": "alert(1)"}},
+    )
+    assert r.status_code == 422
+
+
 def test_measurement_triggers_alert(client):
     sensor = client.post("/sensors", json={"name": "freezer-2"}).json()
     rule = client.post(
@@ -139,3 +147,16 @@ def test_sensor_view_renders(client):
     r = client.get(f"/sensors/{sensor['id']}/view")
     assert r.status_code == 200
     assert "chart-me" in r.text
+
+
+def test_sensor_view_renders_metadata_safely(client):
+    sensor = client.post(
+        "/sensors",
+        json={"name": "safe-meta", "metadata": {"note": "<img src=x onerror=alert(1)>"}},
+    ).json()
+    r = client.get(f"/sensors/{sensor['id']}/view")
+    assert r.status_code == 200
+    assert "note" in r.text
+    # Ensure HTML is escaped rather than interpreted as markup.
+    assert "<img" not in r.text
+    assert "&lt;img" in r.text
