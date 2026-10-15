@@ -139,3 +139,5 @@ def test_sensor_view_renders(client):
     r = client.get(f"/sensors/{sensor['id']}/view")
     assert r.status_code == 200
     assert "chart-me" in r.text
+    assert 'src="/static/app.js"' in r.text
+    assert "cdn.jsdelivr.net" not in r.text
