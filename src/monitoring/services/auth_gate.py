@@ -32,7 +32,9 @@ class PathAuthMiddleware(BaseHTTPMiddleware):
         self._secret = secret
 
     async def dispatch(self, request: Request, call_next):
-        path = request.url.path
+        # Use the raw ASGI path from the scope rather than request.url.path.
+        # This avoids any URL reconstruction quirks affecting auth decisions.
+        path = request.scope.get("path") or request.url.path
 
         if _matches_any(path, _PUBLIC_PREFIXES):
             return await call_next(request)
