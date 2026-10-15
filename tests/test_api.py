@@ -139,3 +139,26 @@ def test_sensor_view_renders(client):
     r = client.get(f"/sensors/{sensor['id']}/view")
     assert r.status_code == 200
     assert "chart-me" in r.text
+
+
+def test_sensor_view_does_not_render_metadata_as_attributes(client):
+    sensor = client.post(
+        "/sensors",
+        json={
+            "name": "xss-metadata",
+            "metadata": {"onclick": "alert(1)", "note": "<img src=x onerror=alert(1)>"},
+        },
+    ).json()
+    r = client.get(f"/sensors/{sensor['id']}/view")
+    assert r.status_code == 200
+
+    # Regression guard: user-provided metadata must never be applied as raw HTML attributes.
+    assert "onclick=" not in r.text
+    assert "onerror=" not in r.text
+
+    # Metadata values should not be reflected back into the HTML response.
+    assert "<img src=x" not in r.text
+    assert "alert(1)" not in r.text
+
+    # The page may show a count, but must not render raw keys/values as attributes.
+    assert "metadata (2)" in r.text
