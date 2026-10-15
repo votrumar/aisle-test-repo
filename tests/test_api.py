@@ -139,3 +139,18 @@ def test_sensor_view_renders(client):
     r = client.get(f"/sensors/{sensor['id']}/view")
     assert r.status_code == 200
     assert "chart-me" in r.text
+
+
+def test_sensor_view_metadata_is_rendered_as_data_attributes(client):
+    sensor = client.post(
+        "/sensors",
+        json={"name": "xss-sensor", "metadata": {"onmouseover": "alert(1)", "zone": "A-1"}},
+    ).json()
+
+    r = client.get(f"/sensors/{sensor['id']}/view")
+    assert r.status_code == 200
+
+    # Metadata must not become executable HTML event-handler attributes.
+    assert " onmouseover=\"" not in r.text
+    assert "data-meta-onmouseover=\"alert(1)\"" in r.text
+    assert "data-meta-zone=\"A-1\"" in r.text

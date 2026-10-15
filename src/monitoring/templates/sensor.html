@@ -7,7 +7,10 @@
     Created {{ sensor.created_at.strftime("%Y-%m-%d %H:%M") }}.
   </p>
 
-  <div class="sensor-meta-badge" {{ sensor.metadata_json|xmlattr }}>
+  <div class="sensor-meta-badge"
+       {% for key, value in (sensor.metadata_json or {}).items() %}
+         data-meta-{{ key|e }}="{{ value|e }}"
+       {% endfor %}>
     metadata
   </div>
 
