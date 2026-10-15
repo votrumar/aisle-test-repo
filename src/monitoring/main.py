@@ -5,8 +5,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .routers import admin, alert_events, alert_rules, dashboard, measurements, sensors
 from . import services  # noqa: F401
-from .services.auth_gate import PathAuthMiddleware
-import os
+from .services.auth_gate import PathAuthMiddleware, get_auth_secret
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -16,7 +15,7 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         PathAuthMiddleware,
-        secret=os.environ.get("MONITORING_AUTH_SECRET", "dev-secret"),
+        secret=get_auth_secret(),
     )
 
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")

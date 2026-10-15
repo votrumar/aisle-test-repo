@@ -1,3 +1,14 @@
+from fastapi.testclient import TestClient
+
+from monitoring.main import create_app
+from monitoring.services.tokens import sign
+
+
+def _admin_headers(secret: str) -> dict[str, str]:
+    token = sign({"sub": "admin"}, secret)
+    return {"Authorization": f"Bearer {token}"}
+
+
 def test_healthz(client):
     r = client.get("/healthz")
     assert r.status_code == 200
@@ -139,3 +150,79 @@ def test_sensor_view_renders(client):
     r = client.get(f"/sensors/{sensor['id']}/view")
     assert r.status_code == 200
     assert "chart-me" in r.text
+
+
+def test_admin_import_config_requires_configured_secret(monkeypatch):
+    monkeypatch.delenv("MONITORING_AUTH_SECRET", raising=False)
+
+    with TestClient(create_app()) as admin_client:
+        r = admin_client.post("/admin/import-config", content="rules: []")
+
+    assert r.status_code == 503
+    assert r.json() == {"detail": "admin auth is not configured"}
+
+
+def test_admin_import_config_rejects_oversized_body(monkeypatch):
+    secret = "test-admin-secret"
+    monkeypatch.setenv("MONITORING_AUTH_SECRET", secret)
+
+    with TestClient(create_app()) as admin_client:
+        r = admin_client.post(
+            "/admin/import-config",
+            content="a" * (2 * 1024 * 1024),
+            headers=_admin_headers(secret),
+        )
+
+    assert r.status_code == 413
+    assert r.json() == {"detail": "request body too large"}
+
+
+def test_admin_import_config_accepts_small_body(monkeypatch):
+    secret = "test-admin-secret"
+    monkeypatch.setenv("MONITORING_AUTH_SECRET", secret)
+
+    with TestClient(create_app()) as admin_client:
+        r = admin_client.post(
+            "/admin/import-config",
+            content="rules: []",
+            headers=_admin_headers(secret),
+        )
+
+    assert r.status_code == 200
+    assert r.json() == {"parsed": {"rules": []}}
+
+
+def test_admin_import_sensor_config_rejects_oversized_form(monkeypatch):
+    secret = "test-admin-secret"
+    monkeypatch.setenv("MONITORING_AUTH_SECRET", secret)
+
+    with TestClient(create_app()) as admin_client:
+        r = admin_client.post(
+            "/admin/import-sensor-config",
+            data={"freezer-9": "z" * (3 * 1024 * 1024)},
+            headers=_admin_headers(secret),
+        )
+
+    assert r.status_code == 413
+    assert r.json() == {"detail": "request body too large"}
+
+
+def test_admin_import_sensor_config_accepts_small_form(monkeypatch):
+    secret = "test-admin-secret"
+    monkeypatch.setenv("MONITORING_AUTH_SECRET", secret)
+
+    with TestClient(create_app()) as admin_client:
+        r = admin_client.post(
+            "/admin/import-sensor-config",
+            data={"freezer-9": "warehouse-Z"},
+            headers=_admin_headers(secret),
+        )
+
+        assert r.status_code == 200
+        assert r.json() == {"accepted": 1}
+
+        sensors = admin_client.get("/sensors").json()
+
+    assert len(sensors) == 1
+    assert sensors[0]["name"] == "freezer-9"
+    assert sensors[0]["location"] == "warehouse-Z"
