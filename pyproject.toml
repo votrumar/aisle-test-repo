@@ -22,7 +22,7 @@ dependencies = [
     "cryptography==48.0.1",
     "githubkit==0.13.5",
     "gunicorn==21.2.0",
-    "requests==2.31.0",
+    "requests==2.33.0",
 ]
 
 [project.optional-dependencies]

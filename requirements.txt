@@ -19,5 +19,5 @@ cryptography==48.0.1
 githubkit==0.13.5
 msgpack==1.1.2
 gunicorn==21.2.0
-requests==2.31.0
+requests==2.33.0
 sagemaker==2.257.1
