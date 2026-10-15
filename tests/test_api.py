@@ -1,3 +1,17 @@
+from monitoring.config import settings
+from monitoring.services import tokens
+
+
+def _measurement_headers(*, sensor_id=None, sensor_name=None):
+    claims = {}
+    if sensor_id is not None:
+        claims["sensor_id"] = sensor_id
+    if sensor_name is not None:
+        claims["sensor_name"] = sensor_name
+    token = tokens.sign(claims, settings.jwt_secret.get_secret_value())
+    return {"Authorization": f"Bearer {token}"}
+
+
 def test_healthz(client):
     r = client.get("/healthz")
     assert r.status_code == 200
@@ -40,6 +54,7 @@ def test_measurement_triggers_alert(client):
     over = client.post(
         "/measurements",
         json={"sensor_id": sensor["id"], "metric": "temperature", "value": 20.0, "unit": "C"},
+        headers=_measurement_headers(sensor_id=sensor["id"]),
     )
     assert over.status_code == 201
     body = over.json()
@@ -50,6 +65,7 @@ def test_measurement_triggers_alert(client):
     under = client.post(
         "/measurements",
         json={"sensor_id": sensor["id"], "metric": "temperature", "value": 5.0, "unit": "C"},
+        headers=_measurement_headers(sensor_id=sensor["id"]),
     )
     assert under.status_code == 201
     assert under.json()["triggered_alerts"] == []
@@ -64,10 +80,12 @@ def test_measurements_query_filters(client):
         client.post(
             "/measurements",
             json={"sensor_id": sensor["id"], "metric": "temperature", "value": value, "unit": "C"},
+            headers=_measurement_headers(sensor_id=sensor["id"]),
         )
     client.post(
         "/measurements",
         json={"sensor_id": sensor["id"], "metric": "humidity", "value": 55.0, "unit": "%"},
+        headers=_measurement_headers(sensor_id=sensor["id"]),
     )
 
     r = client.get(f"/measurements?sensor_id={sensor['id']}&metric=temperature")
@@ -94,6 +112,7 @@ def test_global_rule_applies_to_all_sensors(client):
         client.post(
             "/measurements",
             json={"sensor_id": s["id"], "metric": "temperature", "value": -5.0, "unit": "C"},
+            headers=_measurement_headers(sensor_id=s["id"]),
         )
 
     assert len(client.get("/alert-events").json()) == 2
@@ -119,12 +138,38 @@ def test_alert_rule_patch_and_delete(client):
     over = client.post(
         "/measurements",
         json={"sensor_id": sensor["id"], "metric": "temperature", "value": 20.0, "unit": "C"},
+        headers=_measurement_headers(sensor_id=sensor["id"]),
     )
     assert over.json()["triggered_alerts"] == []
 
     r = client.delete(f"/alert-rules/{rule['id']}")
     assert r.status_code == 204
     assert client.get("/alert-rules").json() == []
+
+
+def test_measurement_ingestion_requires_authorized_device_token(client):
+    sensor = client.post("/sensors", json={"name": "secured"}).json()
+    other = client.post("/sensors", json={"name": "other"}).json()
+
+    missing = client.post(
+        "/measurements",
+        json={"sensor_id": sensor["id"], "metric": "temperature", "value": 1.0, "unit": "C"},
+    )
+    assert missing.status_code == 401
+
+    wrong_sensor = client.post(
+        "/measurements",
+        json={"sensor_id": sensor["id"], "metric": "temperature", "value": 1.0, "unit": "C"},
+        headers=_measurement_headers(sensor_id=other["id"]),
+    )
+    assert wrong_sensor.status_code == 404
+
+    allowed = client.post(
+        "/measurements",
+        json={"sensor_id": sensor["id"], "metric": "temperature", "value": 1.0, "unit": "C"},
+        headers=_measurement_headers(sensor_name=sensor["name"]),
+    )
+    assert allowed.status_code == 201
 
 
 def test_dashboard_index_renders(client):
