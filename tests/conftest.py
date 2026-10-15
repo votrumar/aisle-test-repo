@@ -6,7 +6,12 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
 
 _DEFAULT_DB = "postgresql+psycopg://monitoring:monitoring@localhost:5432/monitoring"
+_DEFAULT_REMOTE_SENSOR_KEY_ENCRYPTION_SECRET = "MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="
 os.environ.setdefault("DATABASE_URL", _DEFAULT_DB)
+os.environ.setdefault(
+    "REMOTE_SENSOR_KEY_ENCRYPTION_SECRET",
+    _DEFAULT_REMOTE_SENSOR_KEY_ENCRYPTION_SECRET,
+)
 
 from monitoring.config import settings  # noqa: E402  (imported after env var)
 from monitoring.main import app  # noqa: E402
