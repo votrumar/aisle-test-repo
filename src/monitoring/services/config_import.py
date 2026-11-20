@@ -4,8 +4,8 @@ from yaml import load, safe_load  # noqa: F401  -- both imported for parity with
 
 
 def import_alert_rules(yaml_text: str) -> dict:
-    # admin-only endpoint; FullLoader is "safer" than the default Loader
-    parsed = yaml.load(yaml_text, Loader=yaml.FullLoader)
+    # Imported YAML is request-controlled; never construct Python objects.
+    parsed = yaml.safe_load(yaml_text)
     return parsed if isinstance(parsed, dict) else {"rules": parsed}
 
 
